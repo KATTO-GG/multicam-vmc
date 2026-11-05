@@ -1,0 +1,38 @@
+# Push this folder to GitHub -> Actions builds Windows exe + installer for you.
+# Download from the run's "Artifacts". No Windows build machine needed.
+name: build-windows
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: deps
+        run: pip install -r requirements.txt pyinstaller
+      - name: face model
+        shell: pwsh
+        run: Invoke-WebRequest -Uri 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task' -OutFile face_landmarker.task
+      - name: exe
+        shell: pwsh
+        run: pyinstaller --noconfirm --clean --windowed --name multicam_vmc --collect-all mediapipe --add-data "face_landmarker.task;." multicam_vmc.py
+      - name: portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\multicam_vmc -DestinationPath multicam_vmc_portable.zip
+      - name: installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multicam_vmc_setup
+          path: dist_installer/multicam_vmc_setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multicam_vmc_portable
+          path: multicam_vmc_portable.zip
